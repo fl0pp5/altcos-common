@@ -10,18 +10,18 @@ gi.require_version("OSTree", "1.0")
 
 from gi.repository import Gio, OSTree
 
-from altcos import common
+from altcos import _common
 
 
-class OSName(common.StrEnum):
+class OSName(_common.StrEnum):
     ALTCOS = "altcos"
 
 
-class Arch(common.StrEnum):
+class Arch(_common.StrEnum):
     X86_64 = "x86_64"
 
 
-class Branch(common.StrEnum):
+class Branch(_common.StrEnum):
     SISYPHUS = "sisyphus"
     P10 = "p10"
 
@@ -128,7 +128,7 @@ class Stream:
 
 
 class Repository:
-    class Mode(common.StrEnum):
+    class Mode(_common.StrEnum):
         BARE = "bare"
         ARCHIVE = "archive"
 

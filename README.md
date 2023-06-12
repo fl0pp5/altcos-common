@@ -2,22 +2,8 @@
 
 Библиотека для удобного взаимодейтсвия с `altcos`-репозиториями.
 
-# Пример
+# Примеры
 
-Получение последнего коммита
-```python
-import altcos
-import os
+[Информация о последнем коммите](examples/last_commit_info.py)
 
-from altcos import ostree
-
-# Путь до корня altcos-репозитория
-SR = os.environ["STREAMS_ROOT"]
-
-# Создание экземпляра потока на основе названия ветки
-stream = ostree.Stream.from_ostree_ref(SR, "altcos/x86_64/sisyphus")
-# Открытие ostree репозитория (по умолчанию в режиме bare)
-repo = ostree.Repository(stream).open()
-# Получение последнего коммита
-print(repo.last_commit())
-```
+[Получение коммита по версии](examples/commit_by_version.py)

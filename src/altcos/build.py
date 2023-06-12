@@ -2,15 +2,15 @@ import dataclasses
 import os
 import typing
 
-from altcos import common
+from altcos import _common
 
 
-class Platform(common.StrEnum):
+class Platform(_common.StrEnum):
     QEMU = "qemu"
     METAL = "metal"
 
 
-class Format(common.StrEnum):
+class Format(_common.StrEnum):
     QCOW2 = "qcow2"
     ISO = "iso"
     RAW = "raw"
