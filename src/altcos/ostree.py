@@ -164,6 +164,10 @@ class Repository:
 
         return self.commit_by_version(version, parent)
 
+    def list_streams(self) -> list[Stream]:
+        return [Stream.from_ostree_ref(self.stream.streams_root, ref)
+                for ref in self.storage.list_refs()[1]]
+
 
 class Version:
     def __init__(self,
