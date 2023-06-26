@@ -1,6 +1,6 @@
 [project]
 name = "altcos-common"
-version = "0.0.2"
+version = "1.0.0"
 authors = [
     { name = "Ivan Pepelyaev", email = "fl0pp5@altlinux.org" },
 ]

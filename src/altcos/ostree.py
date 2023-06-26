@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime
+import enum
 import os
 import pathlib
 
@@ -10,18 +11,16 @@ gi.require_version("OSTree", "1.0")
 
 from gi.repository import Gio, OSTree
 
-from altcos import _common
 
-
-class OSName(_common.StrEnum):
+class OSName(enum.StrEnum):
     ALTCOS = "altcos"
 
 
-class Arch(_common.StrEnum):
+class Arch(enum.StrEnum):
     X86_64 = "x86_64"
 
 
-class Branch(_common.StrEnum):
+class Branch(enum.StrEnum):
     SISYPHUS = "sisyphus"
     P10 = "p10"
 
@@ -52,8 +51,8 @@ class Stream:
         """
         :return: строка вида: "altcos/x86_64/p10", "altcos/x86_64/P10/k8s"
         """
-        return str(pathlib.Path(self.osname.value,
-                                self.arch.value,
+        return str(pathlib.Path(self.osname,
+                                self.arch,
                                 self.branch.value.title() if self.substream else self.branch.value,
                                 self.substream or ""))
 
@@ -79,8 +78,8 @@ class Stream:
         :return: корень потока
         """
         return pathlib.Path(self.streams_root,
-                            self.branch.value,
-                            self.arch.value,
+                            self.branch,
+                            self.arch,
                             self.substream or "")
 
     @property
@@ -128,7 +127,7 @@ class Stream:
 
 
 class Repository:
-    class Mode(_common.StrEnum):
+    class Mode(enum.StrEnum):
         BARE = "bare"
         ARCHIVE = "archive"
 

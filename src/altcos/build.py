@@ -1,32 +1,34 @@
 import dataclasses
-import os
-import typing
-
-from altcos import _common
+import enum
 
 
-class Platform(_common.StrEnum):
+class Platform(enum.StrEnum):
     QEMU = "qemu"
     METAL = "metal"
 
 
-class Format(_common.StrEnum):
+class Format(enum.StrEnum):
     QCOW2 = "qcow2"
     ISO = "iso"
     RAW = "raw"
 
 
 @dataclasses.dataclass
-class Disk:
-    location: str | os.PathLike
-    signature: typing.Optional[str | os.PathLike]
-    uncompressed: typing.Optional[str | os.PathLike]
-    uncompressed_signature: typing.Optional[str | os.PathLike]
+class Artifact:
+    location: str
+    signature: str
+    uncompressed: str
+    uncompressed_signature: str
 
 
 @dataclasses.dataclass
-class Artifact:
-    disk: typing.Optional[Disk]
+class Build:
+    platform: Platform
+    fmt: Format
+    disk: Artifact | None = None
+    kernel: Artifact | None = None
+    initrd: Artifact | None = None
+    rootfs: Artifact | None = None
 
 
 ALLOWED_FORMATS = {
@@ -38,3 +40,5 @@ ALLOWED_FORMATS = {
         Format.RAW,
     }
 }
+
+
