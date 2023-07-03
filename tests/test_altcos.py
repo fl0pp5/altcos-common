@@ -1,13 +1,13 @@
 import pathlib
 import unittest
 
-from altcos import ostree
+import altcos
 
 
 class TestStream(unittest.TestCase):
     SR = "<some-path>" # STREAMS_ROOT
-    VALID_STREAM = ostree.Stream.from_ostree_ref(SR, "altcos/x86_64/sisyphus")
-    VALID_SUBSTREAM = ostree.Stream.from_ostree_ref(SR, "altcos/x86_64/Sisyphus/k8s")
+    VALID_STREAM = altcos.Stream.from_ostree_ref(SR, "altcos/x86_64/sisyphus")
+    VALID_SUBSTREAM = altcos.Stream.from_ostree_ref(SR, "altcos/x86_64/Sisyphus/k8s")
 
     def test_like_ostree_ref(self):
         good = "altcos/x86_64/sisyphus"
@@ -20,28 +20,28 @@ class TestStream(unittest.TestCase):
     def test_valid_stream_init_from_ref(self):
         ref = "altcos/x86_64/sisyphus"
         try:
-            ostree.Stream.from_ostree_ref(self.SR, ref)
+            altcos.Stream.from_ostree_ref(self.SR, ref)
         except ValueError as e:
             self.fail(e)
 
     def test_valid_stream_init_from_subref(self):
         ref = "altcos/x86_64/Sisyphus/k8s"
         try:
-            ostree.Stream.from_ostree_ref(self.SR, ref)
+            altcos.Stream.from_ostree_ref(self.SR, ref)
         except ValueError as e:
             self.fail(e)
 
     def test_invalid_stream_init_from_ref(self):
         ref = "altcos/x86_4/branch"
         try:
-            ostree.Stream.from_ostree_ref(self.SR, ref)
+            altcos.Stream.from_ostree_ref(self.SR, ref)
         except ValueError:
             pass
 
     def test_invalid_stream_init_from_subref(self):
         ref = "altcos/x86_65/Lol/k8s"
         try:
-            ostree.Stream.from_ostree_ref(self.SR, ref)
+            altcos.Stream.from_ostree_ref(self.SR, ref)
         except ValueError:
             pass
 
@@ -105,28 +105,28 @@ class TestStream(unittest.TestCase):
 class TestVersion(unittest.TestCase):
     def test_valid_version_init_from_str(self):
         try:
-            ostree.Version.from_str("sisyphus_base.20230101.1.0")
+            altcos.Version.from_str("sisyphus_base.20230101.1.0")
         except ValueError as e:
             self.fail(e)
 
     def test_str(self):
         good = "20230101.1.0"
-        version = ostree.Version.from_str("sisyphus_base.20230101.1.0")
+        version = altcos.Version.from_str("sisyphus_base.20230101.1.0")
         self.assertEqual(good, str(version))
 
     def test_full_version(self):
         good = "sisyphus_base.20230101.1.0"
-        version = ostree.Version.from_str("sisyphus_base.20230101.1.0")
+        version = altcos.Version.from_str("sisyphus_base.20230101.1.0")
         self.assertEqual(good, version.full_version)
 
     def test_full_version_for_subref(self):
         good = "sisyphus_k8s.20230101.1.0"
-        version = ostree.Version.from_str("sisyphus_k8s.20230101.1.0")
+        version = altcos.Version.from_str("sisyphus_k8s.20230101.1.0")
         self.assertEqual(good, version.full_version)
 
     def test_like_path(self):
         good = pathlib.Path("20230101/1/0")
-        version = ostree.Version.from_str("sisyphus_base.20230101.1.0")
+        version = altcos.Version.from_str("sisyphus_base.20230101.1.0")
         self.assertEqual(good, version.like_path)
 
 

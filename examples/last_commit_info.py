@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-from altcos import ostree
+import altcos
 
-stream = ostree.Stream.from_ostree_ref("<altcos-streams-root>",
+stream = altcos.Stream.from_ostree_ref("<altcos-streams-root>",
                                        "altcos/x86_64/sisyphus")
 
-repo = ostree.Repository(stream).open()
+repo = altcos.Repository(stream).open()
 
 commit = repo.last_commit()
 

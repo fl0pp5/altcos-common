@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import dataclasses
 import datetime
 import enum
-import os
 import pathlib
 
 import gi
@@ -25,22 +25,17 @@ class Branch(enum.StrEnum):
     P10 = "p10"
 
 
+@dataclasses.dataclass
 class Stream:
-    def __init__(self,
-                 streams_root: str | os.PathLike,
-                 osname: OSName,
-                 arch: Arch,
-                 branch: Branch,
-                 substream: str | None = None) -> None:
-        self.streams_root = streams_root
-        self.osname = osname
-        self.arch = arch
-        self.branch = branch
-        self.substream = substream
+    streams_root: str
+    osname: OSName
+    arch: Arch
+    branch: Branch
+    name: str | None = None
 
     def base_stream(self) -> Stream:
         """
-        :return: экземпляр "Stream" без поля substream
+        :return: экземпляр "Stream" без поля name
         """
         return Stream(self.streams_root,
                       self.osname,
@@ -53,8 +48,8 @@ class Stream:
         """
         return str(pathlib.Path(self.osname,
                                 self.arch,
-                                self.branch.value.title() if self.substream else self.branch.value,
-                                self.substream or ""))
+                                self.branch.value.title() if self.name else self.branch.value,
+                                self.name or ""))
 
     @classmethod
     def from_ostree_ref(cls, streams_root: str, ref: str) -> Stream:
@@ -80,7 +75,7 @@ class Stream:
         return pathlib.Path(self.streams_root,
                             self.branch,
                             self.arch,
-                            self.substream or "")
+                            self.name or "")
 
     @property
     def rootfs_dir(self) -> pathlib.Path:
@@ -173,12 +168,12 @@ class Version:
                  major: int,
                  minor: int,
                  branch: Branch,
-                 substream: str | None = None,
+                 name: str | None = None,
                  date: str | None = None):
         self.major = major
         self.minor = minor
         self.branch = branch
-        self.substream = substream
+        self.name = name
         self.date = date or datetime.datetime.now().strftime("%Y%m%d")
 
     def __str__(self) -> str:
@@ -192,7 +187,7 @@ class Version:
         """
         :return: строка версии вида: "p10_k8s.20220101.1.0"
         """
-        return f"{self.branch}_{self.substream or 'base'}.{self}"
+        return f"{self.branch}_{self.name or 'base'}.{self}"
 
     @property
     def like_path(self) -> pathlib.Path:
@@ -210,13 +205,13 @@ class Version:
         if len(prefix := parts[0].split("_")) != 2:
             raise ValueError(f"Invalid version prefix format \"{version}\".")
 
-        [branch, substream] = Branch(prefix[0]), prefix[1]
+        [branch, name] = Branch(prefix[0]), prefix[1]
         [date, major, minor] = parts[1], *map(int, parts[2:])
 
-        if substream == "base":
-            substream = None
+        if name == "base":
+            name = None
 
-        return Version(major, minor, branch, substream, date)
+        return Version(major, minor, branch, name, date)
 
 
 class Commit:
@@ -245,3 +240,45 @@ class Commit:
         return Commit(self.repo, parent_hashsum) \
             if parent_hashsum \
             else None
+
+
+class Platform(enum.StrEnum):
+    QEMU = "qemu"
+    METAL = "metal"
+
+
+class Format(enum.StrEnum):
+    QCOW2 = "qcow2"
+    ISO = "iso"
+    RAW = "raw"
+
+
+@dataclasses.dataclass
+class Artifact:
+    location: str | None = None
+    signature: str | None = None
+    uncompressed: str | None = None
+    uncompressed_signature: str | None = None
+
+
+@dataclasses.dataclass
+class Build:
+    platform: Platform
+    fmt: Format
+    disk: Artifact | None = None
+    kernel: Artifact | None = None
+    initrd: Artifact | None = None
+    rootfs: Artifact | None = None
+
+
+ALLOWED_BUILDS = {
+    Platform.QEMU: {
+        Format.QCOW2,
+    },
+    Platform.METAL: {
+        Format.ISO,
+        Format.RAW,
+    }
+}
+
+
