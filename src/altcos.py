@@ -1,19 +1,15 @@
 from __future__ import annotations
 
 import dataclasses
-import datetime
 import enum
 import pathlib
+import datetime
 
 import gi
 
 gi.require_version("OSTree", "1.0")
 
-from gi.repository import Gio, OSTree
-
-
-class OSName(enum.StrEnum):
-    ALTCOS = "altcos"
+from gi.repository import GLib, Gio, OSTree
 
 
 class Arch(enum.StrEnum):
@@ -27,219 +23,193 @@ class Branch(enum.StrEnum):
 
 @dataclasses.dataclass
 class Stream:
-    streams_root: str
-    osname: OSName
+    repo_root: str
     arch: Arch
     branch: Branch
-    name: str | None = None
+    name: str = "base"
+    osname: str = "altcos"
 
-    def base_stream(self) -> Stream:
-        """
-        :return: экземпляр "Stream" без поля name
-        """
-        return Stream(self.streams_root,
-                      self.osname,
-                      self.arch,
-                      self.branch)
+    def __str__(self) -> str:
+        return str(pathlib.Path(self.arch, self.branch, self.name))
+    
+    def export(self) -> str:
+        attrs = [attr for attr in dir(Stream) if isinstance(getattr(Stream, attr), property)]
+        exports = [f"export {attr.upper()}={getattr(self, attr)}" for attr in attrs]
+        exports.extend([f"export {attr.upper()}={getattr(self, attr)}" for attr in self.__dict__])
+        exports.append(f"export STREAM={self}")
 
-    def like_ostree_ref(self) -> str:
-        """
-        :return: строка вида: "altcos/x86_64/p10", "altcos/x86_64/P10/k8s"
-        """
-        return str(pathlib.Path(self.osname,
-                                self.arch,
-                                self.branch.value.title() if self.name else self.branch.value,
-                                self.name or ""))
+        return ";".join(exports)
 
     @classmethod
-    def from_ostree_ref(cls, streams_root: str, ref: str) -> Stream:
-        """
-        :param streams_root: путь до хранилища потоков
-        :param ref: ветка вида: "altcos/x86_64/Sisyphus/k8s"
-        :return: экземпляр "Stream"
-        """
-        if len(parts := ref.lower().split("/")) not in [3, 4]:
-            raise ValueError(f"Invalid reference format :: \"{ref}\".")
+    def from_str(cls, repo_root: str, stream: str) -> Stream:
+        if len(parts := stream.split("/")) != 3 or any(not part for part in parts):
+            raise ValueError(f"invalid stream format :: \"{stream}\"")
 
-        return Stream(streams_root,
-                      OSName(parts[0]),
-                      Arch(parts[1]),
-                      Branch(parts[2]),
-                      parts[3] if len(parts) == 4 else None)
+        return cls(repo_root, Arch(parts[0]), Branch(parts[1]), parts[2])
+    
+    @property
+    def parent(self) -> Stream:
+        """ returns the parent stream, or itself, if itself is the parent """
+        return Stream(self.repo_root, self.arch, self.branch, "base")
 
     @property
     def stream_dir(self) -> pathlib.Path:
-        """
-        :return: корень потока
-        """
-        return pathlib.Path(self.streams_root,
-                            self.branch,
-                            self.arch,
-                            self.name or "")
+        """ current stream directory """
+        return pathlib.Path(self.repo_root, self.branch, self.arch, self.name)
+
+    @property
+    def alt_dir(self) -> pathlib.Path:
+        """ tree of ALT specific directories """
+        return self.stream_dir.joinpath("alt")
 
     @property
     def rootfs_dir(self) -> pathlib.Path:
-        """
-        :return: путь до хранилища rootfs-образов, полученых при помощи mkimage-profiles
-        """
-        return self.base_stream().stream_dir.joinpath("rootfs")
-
+        return self.parent.stream_dir.joinpath("rootfs")
+    
     @property
-    def ostree_bare_dir(self) -> pathlib.Path:
-        """
-        :return: путь до OSTree-репозитория в режиме bare
-        """
-        return self.base_stream().stream_dir.joinpath("ostree", "bare")
-
-    @property
-    def ostree_archive_dir(self) -> pathlib.Path:
-        """
-        :return: путь до OSTree-репозитория в режиме archive
-        """
-        return self.base_stream().stream_dir.joinpath("ostree", "archive")
-
-    @property
-    def vars_dir(self) -> pathlib.Path:
-        """
-        :return: путь к директории версий пользовательского слоя (относящиеся к OSTree-коммитам)
-        """
-        return self.stream_dir.joinpath("vars")
+    def rootfs_archive(self) -> pathlib.Path:
+        return self.rootfs_dir.joinpath(f"altcos-latest-{self.arch}.tar")
 
     @property
     def work_dir(self) -> pathlib.Path:
-        """
-        содержит необходимые директории для работы в overlay-режиме
-        :return: путь до рабочей директории
-        """
-        return self.stream_dir.joinpath("work")
+        return self.alt_dir.joinpath("work")
+
+    @property
+    def vars_dir(self) -> pathlib.Path:
+        return self.alt_dir.joinpath("vars")
 
     @property
     def merged_dir(self) -> pathlib.Path:
-        """
-        :return: путь до директории, примонтированной в overlay-режиме
-        """
         return self.work_dir.joinpath("merged")
+
+    @property
+    def ostree_dir(self) -> pathlib.Path:
+        """ tree of OSTree specific directories """
+        return self.parent.stream_dir.joinpath("ostree")
+
+    @property
+    def ostree_bare_dir(self) -> pathlib.Path:
+        return self.ostree_dir.joinpath("bare")
+
+    @property
+    def ostree_archive_dir(self) -> pathlib.Path:
+        return self.ostree_dir.joinpath("archive")
 
 
 class Repository:
     class Mode(enum.StrEnum):
         BARE = "bare"
         ARCHIVE = "archive"
-
-    def __init__(self, stream: Stream, mode: Repository.Mode = Mode.BARE) -> None:
+    
+    def __init__(self, stream: Stream, mode: Repository.Mode) -> None:
         self.stream = stream
-        match mode:
-            case Repository.Mode.BARE:
-                path = stream.ostree_bare_dir
-            case Repository.Mode.ARCHIVE:
-                path = stream.ostree_archive_dir
-            case _:
-                raise ValueError(f"Invalid mode: \"{mode}\". "
-                                 f"Allowed only: {' '.join(*Repository.Mode)}.")
-        self.storage: OSTree.Repo = OSTree.Repo.new(Gio.file_new_for_path(str(path)))
+        self.mode = mode
 
+        self.path = stream.ostree_bare_dir \
+                if self.mode == Repository.Mode.BARE else stream.ostree_archive_dir
+
+        self.storage: OSTree.Repo = OSTree.Repo.new(Gio.file_new_for_path(str(self.path)))
+    
     def open(self) -> Repository:
         self.storage.open(None)
         return self
 
-    def last_commit(self) -> Commit:
-        hashsum = self.storage.resolve_rev(self.stream.like_ostree_ref(), False)[1]
+    def exists(self) -> bool:
+        try:
+            self.storage.open(None)
+        except GLib.Error:
+            return False
+        return True
+
+    def last_commit(self) -> Commit | None:
+        if (hashsum := self.storage.resolve_rev(str(self.stream), True)[1]) is None:
+            return None
         return Commit(self, hashsum)
 
     def commit_by_version(self, version: Version, commit: Commit = None) -> Commit | None:
         if commit is None:
             commit = self.last_commit()
 
-        if commit.version().full_version == version.full_version:
+        if commit.version.full == version.full:
             return commit
 
-        if (parent := commit.parent()) is None:
+        if (parent := commit.parent) is None:
             return None
 
         return self.commit_by_version(version, parent)
 
     def list_streams(self) -> list[Stream]:
-        return [Stream.from_ostree_ref(self.stream.streams_root, ref)
+        return [Stream.from_str(self.stream.repo_root, ref)
                 for ref in self.storage.list_refs()[1]]
 
 
+@dataclasses.dataclass
 class Version:
-    def __init__(self,
-                 major: int,
-                 minor: int,
-                 branch: Branch,
-                 name: str | None = None,
-                 date: str | None = None):
-        self.major = major
-        self.minor = minor
-        self.branch = branch
-        self.name = name
-        self.date = date or datetime.datetime.now().strftime("%Y%m%d")
+    major: int
+    minor: int
+    branch: Branch
+    name: str = "base"
+    date: datetime.datetime | None = None
+
+    def __post_init__(self) -> None:
+        self.date = self.date or datetime.datetime.now().strftime("%Y%m%d")
 
     def __str__(self) -> str:
-        """
-        :return: строка версии вида: "20220101.1.0"
-        """
         return f"{self.date}.{self.major}.{self.minor}"
 
-    @property
-    def full_version(self) -> str:
-        """
-        :return: строка версии вида: "p10_k8s.20220101.1.0"
-        """
-        return f"{self.branch}_{self.name or 'base'}.{self}"
+    @classmethod
+    def from_str(cls, version: str) -> Version:
+        if len(parts := version.split(".")) != 4:
+            raise ValueError(f"invalid version format \"{version}\"")
+        
+        if len(prefix := parts[0].split("_")) != 2:
+            raise ValueError(f"invalid version prefix format \"{version}\"")
+        
+        [branch, name] = Branch(prefix[0]), prefix[1]
+        [date, major, minor] = parts[1], *map(int, parts[2:])
 
+        return cls(major, minor, branch, name, date)
+
+    @property
+    def full(self) -> str:
+        return f"{self.branch}_{self.name}.{self}"
+    
     @property
     def like_path(self) -> pathlib.Path:
         return pathlib.Path(self.date, str(self.major), str(self.minor))
 
-    @classmethod
-    def from_str(cls, version: str) -> Version:
-        """
-        :param version: e.g. "p10_base.20230101.0.0"
-        :return: экземпляр "Version"
-        """
-        if len(parts := version.split(".")) != 4:
-            raise ValueError(f"Invalid version format \"{version}\".")
 
-        if len(prefix := parts[0].split("_")) != 2:
-            raise ValueError(f"Invalid version prefix format \"{version}\".")
-
-        [branch, name] = Branch(prefix[0]), prefix[1]
-        [date, major, minor] = parts[1], *map(int, parts[2:])
-
-        if name == "base":
-            name = None
-
-        return Version(major, minor, branch, name, date)
-
-
+@dataclasses.dataclass
 class Commit:
-    def __init__(self, repo: Repository, hashsum: str) -> None:
-        self.repo = repo
-        self.hashsum = hashsum
+    repo: Repository
+    hashsum: str
 
     def __str__(self) -> str:
         return self.hashsum
 
-    def open(self) -> Commit:
-        self.repo.storage.load_commit(self.hashsum)
-        return self
+    def exists(self) -> bool:
+        try:
+            self.repo.storage.load_commit(self.hashsum)
+        except GLib.Error:
+            return False
+        return True
 
+    @property
     def version(self) -> Version:
         content = self.repo.storage.load_commit(self.hashsum)
         return Version.from_str(content[1][0]["version"])
 
+    @property
     def description(self) -> str:
         return self.repo.storage.load_commit(self.hashsum)[1][4]
-
+    
+    @property
     def parent(self) -> Commit | None:
         content = self.repo.storage.load_commit(self.hashsum)
         parent_hashsum = OSTree.commit_get_parent(content[1])
 
         return Commit(self.repo, parent_hashsum) \
-            if parent_hashsum \
-            else None
+                if parent_hashsum else None
 
 
 class Platform(enum.StrEnum):
@@ -250,7 +220,6 @@ class Platform(enum.StrEnum):
 class Format(enum.StrEnum):
     QCOW2 = "qcow2"
     ISO = "iso"
-    RAW = "raw"
 
 
 @dataclasses.dataclass
@@ -273,12 +242,9 @@ class Build:
 
 ALLOWED_BUILDS = {
     Platform.QEMU: {
-        Format.QCOW2,
+        Format.QCOW2: None,
     },
     Platform.METAL: {
-        Format.ISO,
-        Format.RAW,
+        Format.ISO: None,
     }
 }
-
-
