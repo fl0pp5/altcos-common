@@ -30,7 +30,7 @@ class Stream:
     osname: str = "altcos"
 
     def __str__(self) -> str:
-        return str(pathlib.Path(self.arch, self.branch, self.name))
+        return str(pathlib.Path(self.osname, self.arch, self.branch, self.name))
     
     def export(self) -> str:
         attrs = [attr for attr in dir(Stream) if isinstance(getattr(Stream, attr), property)]
@@ -42,10 +42,12 @@ class Stream:
 
     @classmethod
     def from_str(cls, repo_root: str, stream: str) -> Stream:
-        if len(parts := stream.split("/")) != 3 or any(not part for part in parts):
+        if len(parts := stream.split("/")) != 4 \
+            or any(not part for part in parts) \
+            or parts[0] != "altcos":
             raise ValueError(f"invalid stream format :: \"{stream}\"")
 
-        return cls(repo_root, Arch(parts[0]), Branch(parts[1]), parts[2])
+        return cls(repo_root, Arch(parts[1]), Branch(parts[2]), parts[3])
     
     @property
     def parent(self) -> Stream:

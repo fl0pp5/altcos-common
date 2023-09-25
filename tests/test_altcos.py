@@ -6,26 +6,26 @@ import altcos
 
 class TestStream(unittest.TestCase):
     SR = "<some-path>" # STREAMS_ROOT
-    VALID_STREAM = altcos.Stream.from_str(SR, "x86_64/sisyphus/base")
-    VALID_SUBSTREAM = altcos.Stream.from_str(SR, "x86_64/sisyphus/k8s")
+    VALID_STREAM = altcos.Stream.from_str(SR, "altcos/x86_64/sisyphus/base")
+    VALID_SUBSTREAM = altcos.Stream.from_str(SR, "altcos/x86_64/sisyphus/k8s")
 
     def test_like_ostree_ref(self):
-        good = "x86_64/sisyphus/base"
+        good = "altcos/x86_64/sisyphus/base"
         self.assertEqual(good, str(self.VALID_STREAM))
 
     def test_like_ostree_ref_for_subref(self):
-        good = "x86_64/sisyphus/k8s"
+        good = "altcos/x86_64/sisyphus/k8s"
         self.assertEqual(good, str(self.VALID_SUBSTREAM))
 
     def test_valid_stream_init_from_ref(self):
-        ref = "x86_64/sisyphus/base"
+        ref = "altcos/x86_64/sisyphus/base"
         try:
             altcos.Stream.from_str(self.SR, ref)
         except ValueError as e:
             self.fail(e)
 
     def test_valid_stream_init_from_subref(self):
-        ref = "x86_64/sisyphus/k8s"
+        ref = "altcos/x86_64/sisyphus/k8s"
         try:
             altcos.Stream.from_str(self.SR, ref)
         except ValueError as e:
